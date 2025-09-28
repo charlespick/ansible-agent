@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Package Linux agent
+      run: |
+        cd agents/linux
+        chmod +x ansible-agent install.sh
+        tar -czf ../../ansible-agent-linux-${{ github.ref_name }}.tar.gz *
+        cd ../..
+
+    - name: Package Windows agent
+      run: |
+        cd agents/windows
+        zip -r ../../ansible-agent-windows-${{ github.ref_name }}.zip *
+        cd ../..
+
+    - name: Generate release notes
+      run: |
+        echo "# Ansible Agent ${{ github.ref_name }}" > RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "## What's New" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "This release includes:" >> RELEASE_NOTES.md
+        echo "- Python relay service with AWX integration" >> RELEASE_NOTES.md
+        echo "- Linux agent with systemd service" >> RELEASE_NOTES.md
+        echo "- Windows agent with Windows service" >> RELEASE_NOTES.md
+        echo "- Kubernetes manifests for deployment" >> RELEASE_NOTES.md
+        echo "- Container image published to GitHub Container Registry" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "## Container Image" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "\`\`\`" >> RELEASE_NOTES.md
+        echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}" >> RELEASE_NOTES.md
+        echo "\`\`\`" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "## Installation" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "### Linux Agent" >> RELEASE_NOTES.md
+        echo "1. Download and extract \`ansible-agent-linux-${{ github.ref_name }}.tar.gz\`" >> RELEASE_NOTES.md
+        echo "2. Run \`sudo ./install.sh\` to install" >> RELEASE_NOTES.md
+        echo "3. Configure \`/etc/ansible-agent/config.conf\`" >> RELEASE_NOTES.md
+        echo "4. Start with \`sudo systemctl enable --now ansible-agent\`" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "### Windows Agent" >> RELEASE_NOTES.md
+        echo "1. Download and extract \`ansible-agent-windows-${{ github.ref_name }}.zip\`" >> RELEASE_NOTES.md
+        echo "2. Run \`.\install.ps1\` as Administrator" >> RELEASE_NOTES.md
+        echo "3. Configure \`C:\Program Files\Ansible Agent\config.json\`" >> RELEASE_NOTES.md
+        echo "4. Start with \`Start-Service -Name AnsibleAgent\`" >> RELEASE_NOTES.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: RELEASE_NOTES.md
+        files: |
+          ansible-agent-linux-${{ github.ref_name }}.tar.gz
+          ansible-agent-windows-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

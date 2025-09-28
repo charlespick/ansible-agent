@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ansible-agent
+  namespace: ansible-system
+  labels:
+    app: ansible-agent
+  annotations:
+    # Adjust these annotations based on your ingress controller
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Adjust based on your cert-manager setup
+spec:
+  tls:
+  - hosts:
+    - ansible-agent.your-domain.com  # Replace with your domain
+    secretName: ansible-agent-tls
+  rules:
+  - host: ansible-agent.your-domain.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ansible-agent
+            port:
+              number: 80
