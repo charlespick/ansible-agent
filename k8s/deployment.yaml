@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ansible-agent
+  namespace: ansible-system
+  labels:
+    app: ansible-agent
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: ansible-agent
+  template:
+    metadata:
+      labels:
+        app: ansible-agent
+    spec:
+      serviceAccountName: ansible-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: ansible-agent
+        image: ghcr.io/charlespick/ansible-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        env:
+        # Configuration from ConfigMap
+        - name: GLOBAL_RATE_LIMIT
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: GLOBAL_RATE_LIMIT
+        - name: PER_IP_RATE_LIMIT
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: PER_IP_RATE_LIMIT
+        - name: MAX_HOSTNAME_LENGTH
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: MAX_HOSTNAME_LENGTH
+        - name: MIN_HOSTNAME_LENGTH
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: MIN_HOSTNAME_LENGTH
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: PORT
+        - name: FLASK_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: FLASK_ENV
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: ansible-agent-config
+              key: REDIS_URL
+        
+        # Secrets
+        - name: AWX_API_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_API_ENDPOINT
+        - name: AWX_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_USERNAME
+              optional: true
+        - name: AWX_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_PASSWORD
+              optional: true
+        - name: AWX_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_TOKEN
+              optional: true
+        - name: AWX_TEMPLATE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_TEMPLATE_NAME
+              optional: true
+        - name: AWX_WORKFLOW_NAME
+          valueFrom:
+            secretKeyRef:
+              name: ansible-agent-secrets
+              key: AWX_WORKFLOW_NAME
+              optional: true
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL

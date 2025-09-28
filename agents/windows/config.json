@@ -1,0 +1,6 @@
+{
+    "RelayUrl": "https://your-ansible-relay.example.com",
+    "IntervalHours": 24,
+    "Enabled": true,
+    "HostnameOverride": null
+}
